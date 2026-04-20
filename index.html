@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Online Shooter | Скины, кейсы, валюта</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0a0f1e, #0a1a2a);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', 'Courier New', monospace;
+            overflow: hidden;
+        }
+        .game-container {
+            position: relative;
+            box-shadow: 0 20px 35px rgba(0,0,0,0.5);
+            border-radius: 20px;
+            border: 2px solid #ffcc44;
+        }
+        canvas {
+            display: block;
+            border-radius: 18px;
+            cursor: crosshair;
+        }
+        .hud {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 12px;
+            pointer-events: none;
+            z-index: 10;
+            font-weight: bold;
+            text-shadow: 2px 2px 0 #000;
+        }
+        .stat-card {
+            background: rgba(0,0,0,0.65);
+            backdrop-filter: blur(4px);
+            padding: 8px 16px;
+            border-radius: 40px;
+            border-left: 4px solid #ffcc44;
+            color: #ffe6aa;
+            font-size: 1.2rem;
+            letter-spacing: 1px;
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .stat-card span:first-child {
+            color: #ffaa33;
+        }
+        .buttons {
+            display: flex;
+            gap: 12px;
+        }
+        button {
+            background: #1e2a3a;
+            border: none;
+            color: #ffd966;
+            font-weight: bold;
+            padding: 6px 16px;
+            border-radius: 60px;
+            font-family: inherit;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 2px 6px black;
+            backdrop-filter: blur(2px);
+            pointer-events: auto;
+        }
+        button:hover {
+            background: #ffaa33;
+            color: #1e1a1a;
+            transform: scale(1.02);
+            box-shadow: 0 0 8px #ffaa66;
+        }
+        .modal {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.75);
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            visibility: hidden;
+            font-family: monospace;
+        }
+        .modal-content {
+            background: #11171f;
+            border-radius: 30px;
+            width: 340px;
+            max-width: 90vw;
+            padding: 20px;
+            border: 2px solid #ffcc55;
+            color: #f0e6c5;
+            box-shadow: 0 20px 35px black;
+        }
+        .modal-content h3 {
+            margin-top: 0;
+            text-align: center;
+            color: #ffcc66;
+        }
+        .skin-list, .case-list {
+            max-height: 260px;
+            overflow-y: auto;
+            margin: 15px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .skin-item, .case-item {
+            background: #1f2a36;
+            padding: 10px;
+            border-radius: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .buy-btn, .open-btn {
+            background: #ffaa33;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close-modal {
+            background: #5a3e1a;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .death-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 20px;
+            border-radius: 18px;
+            z-index: 50;
+            backdrop-filter: blur(5px);
+            visibility: hidden;
+        }
+        .restart-btn {
+            background: #ff884d;
+            font-size: 1.5rem;
+            padding: 12px 32px;
+        }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <canvas id="gameCanvas" width="1100" height="650"></canvas>
+    <div class="hud">
+        <div class="stat-card">❤️ <span id="healthVal">100</span></div>
+        <div class="stat-card">💰 <span id="coinsVal">0</span></div>
+        <div class="stat-card">🔫 <span id="skinName">Default</span></div>
+        <div class="buttons">
+            <button id="shopBtn">🎨 СКИНЫ</button>
+            <button id="caseBtn">📦 КЕЙСЫ</button>
+        </div>
+    </div>
+    <div class="death-overlay" id="deathOverlay">
+        <div style="background:#000000aa; padding:20px; border-radius: 50px; text-align:center;">
+            <h2>💀 ВЫ ПОГИБЛИ 💀</h2>
+            <button class="restart-btn" id="restartBtn">🔁 РЕСТАРТ</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модалка магазина скинов -->
+<div id="shopModal" class="modal">
+    <div class="modal-content">
+        <h3>🎨 МАГАЗИН СКИНОВ</h3>
+        <div id="skinShopList" class="skin-list"></div>
+        <button class="close-modal" onclick="closeShop()">ЗАКРЫТЬ</button>
+    </div>
+</div>
+
+<!-- Модалка кейсов -->
+<div id="caseModal" class="modal">
+    <div class="modal-content">
+        <h3>📦 ОТКРЫТЬ КЕЙС</h3>
+        <div id="caseList" class="case-list"></div>
+        <div id="caseResult" style="margin-top:10px; font-size:14px; text-align:center;"></div>
+        <button class="close-modal" onclick="closeCase()">ЗАКРЫТЬ</button>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // -------------------- CANVAS & CONTEXT --------------------
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // -------------------- ИГРОВЫЕ ПАРАМЕТРЫ --------------------
+        let gameRunning = true;
+        let animationId = null;
+        
+        // Игрок
+        let player = {
+            x: canvas.width/2,
+            y: canvas.height/2,
+            radius: 18,
+            health: 100,
+            maxHealth: 100,
+            invincibleFrames: 0
+        };
+        
+        let bullets = [];
+        let enemies = [];
+        let coins = 0;
+        let kills = 0;
+        
+        // оружие
+        let shootCooldown = 0;
+        const SHOOT_DELAY = 10; // кадров
+        let mouseX = canvas.width/2, mouseY = canvas.height/2;
+        
+        // СКИНЫ и КЕЙСЫ (система)
+        let currentSkin = "default";    // id скина
+        let ownedSkins = ["default"];   // список id скинов
+        let skinsDB = {
+            default: { name: "Обычный", color: "#ffaa66", price: 0, bulletColor: "#ffcc88" },
+            gold:    { name: "Золотой", color: "#FFD700", price: 250, bulletColor: "#FFD966" },
+            plasma:  { name: "Плазма",  color: "#3eff9e", price: 400, bulletColor: "#6effb0" },
+            inferno: { name: "Инферно", color: "#ff4d4d", price: 600, bulletColor: "#ff7b4a" },
+            void:    { name: "Бездна",  color: "#b86eff", price: 900, bulletColor: "#c08eff" }
+        };
+        
+        // кейсы
+        let casesDB = {
+            "Обычный кейс": { price: 150, rewards: ["gold","plasma","inferno","void","default"], chances: [0.35,0.25,0.2,0.1,0.1] }
+        };
+        
+        // Сохранение / загрузка из localStorage
+        function saveProgress() {
+            localStorage.setItem('shooter_coins', coins);
+            localStorage.setItem('shooter_skins', JSON.stringify(ownedSkins));
+            localStorage.setItem('shooter_currSkin', currentSkin);
+            localStorage.setItem('shooter_kills', kills);
+        }
+        
+        function loadProgress() {
+            let savedCoins = localStorage.getItem('shooter_coins');
+            if(savedCoins !== null) coins = parseInt(savedCoins);
+            let savedSkins = localStorage.getItem('shooter_skins');
+            if(savedSkins !== null) {
+                ownedSkins = JSON.parse(savedSkins);
+                if(!ownedSkins.includes('default')) ownedSkins.push('default');
+            }
+            let savedSkin = localStorage.getItem('shooter_currSkin');
+            if(savedSkin !== null && ownedSkins.includes(savedSkin)) currentSkin = savedSkin;
+            let savedKills = localStorage.getItem('shooter_kills');
+            if(savedKills !== null) kills = parseInt(savedKills);
+            updateHUD();
+        }
+        
+        function updateHUD() {
+            document.getElementById('healthVal').innerText = player.health;
+            document.getElementById('coinsVal').innerText = coins;
+            let skinObj = skinsDB[currentSkin] || skinsDB.default;
+            document.getElementById('skinName').innerText = skinObj.name;
+        }
+        
+        // Купить скин
+        function buySkin(skinId) {
+            if(ownedSkins.includes(skinId)) {
+                alert("У вас уже есть этот скин!");
+                return false;
+            }
+            let skin = skinsDB[skinId];
+            if(coins >= skin.price) {
+                coins -= skin.price;
+                ownedSkins.push(skinId);
+                saveProgress();
+                updateHUD();
+                renderShopModal();
+                return true;
+            } else {
+                alert("Не хватает монет! 💰");
+                return false;
+            }
+        }
+        
+        // Экипировать скин
+        function equipSkin(skinId) {
+            if(ownedSkins.includes(skinId)) {
+                currentSkin = skinId;
+                saveProgress();
+                updateHUD();
+                renderShopModal();
+            } else {
+                alert("Сначала купите этот скин!");
+            }
+        }
+        
+        // Открыть кейс
+        function openCase(caseName) {
+            let caseData = casesDB[caseName];
+            if(!caseData) return;
+            if(coins < caseData.price) {
+                alert(`Не хватает монет! Нужно ${caseData.price}💰`);
+                return;
+            }
+            coins -= caseData.price;
+            // выпадение
+            let rand = Math.random();
+            let cumulative = 0;
+            let selected = "default";
+            for(let i=0; i<caseData.rewards.length; i++) {
+                cumulative += caseData.chances[i];
+                if(rand <= cumulative) {
+                    selected = caseData.rewards[i];
+                    break;
+                }
+            }
+            // добавить скин если не было
+            if(!ownedSkins.includes(selected)) {
+                ownedSkins.push(selected);
+            }
+            // возможно сразу экипируем (новый скин круто)
+            if(selected !== currentSkin && confirm(`🎉 Вам выпал скин "${skinsDB[selected].name}"! Надеть его сейчас?`)) {
+                currentSkin = selected;
+            } else if(selected !== currentSkin){
+                alert(`🎁 Выпал скин: ${skinsDB[selected].name} (добавлен в инвентарь)`);
+            } else {
+                alert(`🎁 Выпал скин: ${skinsDB[selected].name} (уже экипирован)`);
+            }
+            saveProgress();
+            updateHUD();
+            // показать результат в модалке
+            let resultDiv = document.getElementById('caseResult');
+            resultDiv.innerHTML = `✨ ВЫПАЛО: ${skinsDB[selected].name} ✨`;
+            setTimeout(()=>{ if(document.getElementById('caseModal').style.visibility !== 'visible') resultDiv.innerHTML = ''; }, 2000);
+            renderCaseModal();
+        }
+        
+        // Отрисовка магазина
+        function renderShopModal() {
+            let container = document.getElementById('skinShopList');
+            if(!container) return;
+            container.innerHTML = '';
+            for(let [id, skin] of Object.entries(skinsDB)) {
+                let div = document.createElement('div');
+                div.className = 'skin-item';
+                let isOwned = ownedSkins.includes(id);
+                let isEquipped = (currentSkin === id);
+                div.innerHTML = `
+                    <div><strong style="color:${skin.color}">${skin.name}</strong><br>💰 ${skin.price}</div>
+                    <div>
+                        ${!isOwned ? `<button class="buy-btn" data-id="${id}">Купить</button>` : 
+                          (isEquipped ? `<span style="color:lightgreen;">✔ Экипирован</span>` : 
+                           `<button class="buy-btn equip-btn" data-id="${id}">Надеть</button>`)}
+                    </div>
+                `;
+                container.appendChild(div);
+            }
+            // обработчики после рендера
+            document.querySelectorAll('.buy-btn[data-id]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    let id = btn.getAttribute('data-id');
+                    if(btn.innerText === 'Купить') buySkin(id);
+                    else equipSkin(id);
+                });
+            });
+        }
+        
+        function renderCaseModal() {
+            let container = document.getElementById('caseList');
+            if(!container) return;
+            container.innerHTML = '';
+            for(let [name, data] of Object.entries(casesDB)) {
+                let div = document.createElement('div');
+                div.className = 'case-item';
+                div.innerHTML = `
+                    <span>📦 ${name}</span>
+                    <span>💰 ${data.price}</span>
+                    <button class="open-btn" data-case="${name}">ОТКРЫТЬ</button>
+                `;
+                container.appendChild(div);
+            }
+            document.querySelectorAll('.open-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    let caseName = btn.getAttribute('data-case');
+                    openCase(caseName);
+                });
+            });
+        }
+        
+        // -------------------- ИГРОВАЯ ЛОГИКА --------------------
+        function spawnEnemy() {
+            if(!gameRunning) return;
+            let side = Math.floor(Math.random() * 4);
+            let x, y;
+            if(side === 0) { x = Math.random() * canvas.width; y = -20; }
+            else if(side === 2) { x = Math.random() * canvas.width; y = canvas.height + 20; }
+            else if(side === 1) { x = canvas.width + 20; y = Math.random() * canvas.height; }
+            else { x = -20; y = Math.random() * canvas.height; }
+            enemies.push({
+                x: x, y: y, radius: 15,
+                health: 30,
+                speed: 1.8,
+                damage: 12
+            });
+        }
+        
+        function updateGame() {
+            if(!gameRunning) return;
+            
+            // движение игрока (WASD)
+            const keys = {};
+            window.addEventListener('keydown', (e) => { keys[e.key] = true; });
+            window.addEventListener('keyup', (e) => { keys[e.key] = false; });
+            let move = { x:0, y:0 };
+            if(keys['w'] || keys['ArrowUp']) move.y -= 1;
+            if(keys['s'] || keys['ArrowDown']) move.y += 1;
+            if(keys['a'] || keys['ArrowLeft']) move.x -= 1;
+            if(keys['d'] || keys['ArrowRight']) move.x += 1;
+            if(move.x !== 0 || move.y !== 0) {
+                let len = Math.hypot(move.x, move.y);
+                move.x /= len; move.y /= len;
+                player.x += move.x * 5;
+                player.y += move.y * 5;
+            }
+            // границы
+            player.x = Math.min(Math.max(player.x, player.radius+5), canvas.width - player.radius-5);
+            player.y = Math.min(Math.max(player.y, player.radius+5), canvas.height - player.radius-5);
+            
+            // неуязвимость
+            if(player.invincibleFrames > 0) player.invincibleFrames--;
+            
+            // стрельба
+            if(shootCooldown > 0) shootCooldown--;
+            if(mouseDown && shootCooldown === 0 && gameRunning) {
+                shootCooldown = SHOOT_DELAY;
+                let dx = mouseX - player.x;
+                let dy = mouseY - player.y;
+                let angle = Math.atan2(dy, dx);
+                let speed = 9;
+                bullets.push({
+                    x: player.x, y: player.y, radius: 5,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    damage: 25,
+                    life: 180
+                });
+            }
+            
+            // пули
+            for(let i=0; i<bullets.length; i++) {
+                bullets[i].x += bullets[i].vx;
+                bullets[i].y += bullets[i].vy;
+                bullets[i].life--;
+                if(bullets[i].x < -50 || bullets[i].x > canvas.width+50 || bullets[i].y < -50 || bullets[i].y > canvas.height+50 || bullets[i].life <= 0) {
+                    bullets.splice(i,1); i--; continue;
+                }
+                // коллизия с врагами
+                for(let j=0; j<enemies.length; j++) {
+                    let dx = bullets[i].x - enemies[j].x;
+                    let dy = bullets[i].y - enemies[j].y;
+                    let dist = Math.hypot(dx,dy);
+                    if(dist < bullets[i].radius + enemies[j].radius) {
+                        enemies[j].health -= bullets[i].damage;
+                        bullets.splice(i,1); i--;
+                        if(enemies[j].health <= 0) {
+                            // убийство
+                            let reward = 35 + Math.floor(Math.random() * 25);
+                            coins += reward;
+                            kills++;
+                            enemies.splice(j,1);
+                            updateHUD();
+                            saveProgress();
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            // враги двигаются к игроку
+            for(let i=0; i<enemies.length; i++) {
+                let dx = player.x - enemies[i].x;
+                let dy = player.y - enemies[i].y;
+                let dist = Math.hypot(dx,dy);
+                if(dist > 0.01) {
+                    enemies[i].x += (dx/dist) * enemies[i].speed;
+                    enemies[i].y += (dy/dist) * enemies[i].speed;
+                }
+                // урон игроку
+                let collisionDist = player.radius + enemies[i].radius;
+                if(Math.hypot(player.x - enemies[i].x, player.y - enemies[i].y) < collisionDist && player.invincibleFrames === 0) {
+                    player.health -= enemies[i].damage;
+                    player.invincibleFrames = 20;
+                    updateHUD();
+                    if(player.health <= 0) {
+                        gameRunning = false;
+                        document.getElementById('deathOverlay').style.visibility = 'visible';
+                        cancelAnimationFrame(animationId);
+                    }
+                }
+            }
+            
+            // спавн врагов
+            if(Math.random() < 0.02 && enemies.length < 10) spawnEnemy();
+        }
+        
+        function draw() {
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            // фон
+            ctx.fillStyle = '#11161f';
+            ctx.fillRect(0,0,canvas.width,canvas.height);
+            for(let i=0;i<100;i++) {
+                ctx.fillStyle = '#2a3342';
+                ctx.beginPath();
+                ctx.arc( (i*131)%canvas.width, (i*253)%canvas.height, 2,0,Math.PI*2);
+                ctx.fill();
+            }
+            // враги
+            for(let e of enemies) {
+                ctx.shadowBlur=0;
+                ctx.fillStyle = '#dd4455';
+                ctx.beginPath();
+                ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = 'white';
+                ctx.font = "bold 14px monospace";
+                ctx.fillText("👾", e.x-10, e.y-8);
+                // полоска здоровья
+                ctx.fillStyle = '#aa3333';
+                ctx.fillRect(e.x-15, e.y-18, 30, 5);
+                ctx.fillStyle = '#55ff55';
+                ctx.fillRect(e.x-15, e.y-18, 30 * (e.health/30), 5);
+            }
+            // пули (цвет от скина)
+            let bulletColor = skinsDB[currentSkin]?.bulletColor || "#ffcc88";
+            for(let b of bullets) {
+                ctx.fillStyle = bulletColor;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 5, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(b.x-1, b.y-1, 2, 0, Math.PI*2);
+                ctx.fill();
+            }
+            // игрок
+            let skinColor = skinsDB[currentSkin]?.color || "#ffaa66";
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = skinColor;
+            ctx.fillStyle = skinColor;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#111';
+            ctx.beginPath();
+            ctx.arc(player.x-5, player.y-5, 4, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(player.x-7, player.y-7, 2, 0, Math.PI*2);
+            ctx.fill();
+            // оружие в сторону мыши
+            ctx.beginPath();
+            let angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+            let armX = player.x + Math.cos(angle) * 18;
+            let armY = player.y + Math.sin(angle) * 18;
+            ctx.moveTo(player.x, player.y);
+            ctx.lineTo(armX, armY);
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = "#888";
+            ctx.stroke();
+            ctx.fillStyle = "#ffaa44";
+            ctx.beginPath();
+            ctx.arc(armX, armY, 6, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            // полоска здоровья игрока
+            ctx.fillStyle = '#600000';
+            ctx.fillRect(player.x-30, player.y-25, 60, 8);
+            ctx.fillStyle = '#ff5555';
+            ctx.fillRect(player.x-30, player.y-25, 60 * (player.health/player.maxHealth), 8);
+        }
+        
+        // Цикл анимации
+        function gameLoop() {
+            if(gameRunning) {
+                updateGame();
+                draw();
+            } else {
+                draw(); // отрисуем последний кадр
+            }
+            animationId = requestAnimationFrame(gameLoop);
+        }
+        
+        // мышь для прицела и стрельбы
+        let mouseDown = false;
+        function handleMouseMove(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            let canvasX = (e.clientX - rect.left) * scaleX;
+            let canvasY = (e.clientY - rect.top) * scaleY;
+            mouseX = Math.min(Math.max(canvasX, 0), canvas.width);
+            mouseY = Math.min(Math.max(canvasY, 0), canvas.height);
+        }
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('mousedown', (e) => { if(e.button === 0) mouseDown = true; });
+        window.addEventListener('mouseup', (e) => { if(e.button === 0) mouseDown = false; });
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+        
+        // UI модалки
+        window.closeShop = function() {
+            document.getElementById('shopModal').style.visibility = 'hidden';
+        }
+        window.closeCase = function() {
+            document.getElementById('caseModal').style.visibility = 'hidden';
+            document.getElementById('caseResult').innerHTML = '';
+        }
+        document.getElementById('shopBtn').onclick = () => {
+            renderShopModal();
+            document.getElementById('shopModal').style.visibility = 'visible';
+        };
+        document.getElementById('caseBtn').onclick = () => {
+            renderCaseModal();
+            document.getElementById('caseModal').style.visibility = 'visible';
+        };
+        
+        // Рестарт
+        function restartGame() {
+            gameRunning = true;
+            player.health = 100;
+            player.x = canvas.width/2;
+            player.y = canvas.height/2;
+            enemies = [];
+            bullets = [];
+            player.invincibleFrames = 0;
+            document.getElementById('deathOverlay').style.visibility = 'hidden';
+            updateHUD();
+            saveProgress();
+        }
+        document.getElementById('restartBtn').onclick = () => {
+            restartGame();
+            if(!animationId) gameLoop();
+        };
+        
+        // Инициализация и загрузка
+        loadProgress();
+        updateHUD();
+        // спавним пару врагов для начала
+        for(let i=0;i<3;i++) spawnEnemy();
+        gameLoop();
+        
+        // обработка клавиш (глобально, чтобы не терять фокус)
+        window.addEventListener('keydown', (e) => {
+            if(e.key === ' ' || e.key === 'Space') {
+                e.preventDefault();
+                if(gameRunning && shootCooldown === 0) {
+                    shootCooldown = SHOOT_DELAY;
+                    let dx = mouseX - player.x;
+                    let dy = mouseY - player.y;
+                    let angle = Math.atan2(dy, dx);
+                    bullets.push({
+                        x: player.x, y: player.y, radius: 5,
+                        vx: Math.cos(angle)*9, vy: Math.sin(angle)*9,
+                        damage: 25, life: 180
+                    });
+                }
+            }
+        });
+    })();
+</script>
+</body>
+</html>
